@@ -1,1 +1,212 @@
 
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>義工證明生成工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* 證書預覽樣式 - 強制 A4 尺寸 */
+        #certificate-preview {
+            width: 210mm;
+            height: 297mm;
+            padding: 25mm; /* 標準邊距 */
+            margin: 20px auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-sizing: border-box;
+            overflow: hidden; /* 強制不產生溢出 */
+        }
+
+        .cert-content-wrapper {
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* 垂直置中關鍵 */
+            height: 100%;
+            width: 100%;
+        }
+
+        .cert-header {
+            font-size: 48px;
+            font-weight: 700;
+            color: #1e293b;
+            text-align: center;
+            margin-bottom: 60px;
+            letter-spacing: 12px;
+        }
+
+        .cert-body {
+            font-size: 22px;
+            line-height: 2.2; 
+            text-align: center; /* 內文置中 */
+            margin-bottom: 160px; /* 進一步加大內文與下款之間的距離 */
+            color: #334155;
+            padding: 0 10px;
+            word-break: break-all;
+        }
+
+        .highlight {
+            border-bottom: 1.5px solid #64748b;
+            padding: 0 12px;
+            font-weight: 700;
+            display: inline-block;
+            min-width: 100px;
+            color: #0f172a;
+            text-align: center;
+        }
+
+        .cert-footer {
+            text-align: right;
+            font-size: 20px;
+            line-height: 1.8;
+            padding-right: 10px;
+        }
+
+        .org-name {
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .date-label {
+            font-weight: 700;
+        }
+
+        .date-value {
+            border-bottom: 1.5px solid #64748b;
+            padding: 0 8px;
+            display: inline-block;
+            min-width: 120px;
+            text-align: center;
+        }
+
+        /* 列印相關設定 */
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 0; /* 移除系統默認邊距 */
+            }
+            html, body {
+                height: 100%;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white;
+            }
+            .no-print {
+                display: none !important;
+            }
+            #certificate-preview {
+                box-shadow: none;
+                margin: 0 !important;
+                border: none;
+                width: 210mm;
+                height: 297mm;
+                page-break-after: avoid; /* 防止產生空白頁 */
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-10">
+
+    <div class="max-w-4xl mx-auto no-print bg-white p-8 rounded-2xl shadow-sm border border-slate-200 mb-10">
+        <h1 class="text-2xl font-bold mb-6 text-slate-800 flex items-center">
+            <span class="bg-slate-800 text-white p-1 rounded mr-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+            </span>
+            義工證明生成器
+        </h1>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+            <div>
+                <label class="block text-sm font-semibold text-slate-600 mb-2">義工姓名</label>
+                <input type="text" id="input-name" placeholder="輸入姓名" oninput="updateCert()" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-400 focus:bg-white outline-none transition-all">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-slate-600 mb-2">活動日期</label>
+                <input type="text" id="input-date-range" placeholder="例如：2024年5月1日" oninput="updateCert()" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-400 focus:bg-white outline-none transition-all">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-slate-600 mb-2">義工時數</label>
+                <input type="text" id="input-hours" placeholder="例如：3" oninput="updateCert()" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-400 focus:bg-white outline-none transition-all">
+            </div>
+        </div>
+        <button onclick="handlePrint()" class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-4 px-8 rounded-xl transition duration-300 flex items-center justify-center w-full md:w-auto shadow-md">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+            列印 / 匯出 PDF
+        </button>
+        <div class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+            <p class="text-sm text-blue-800 font-semibold mb-1">列印建議：</p>
+            <ul class="text-xs text-blue-700 list-disc list-inside space-y-1">
+                <li>目的地選擇「另存為 PDF」或直接列印。</li>
+                <li><strong>佈局：</strong> 縱向 (Portrait)。</li>
+                <li><strong>邊距：</strong> 無 (None)。</li>
+                <li><strong>縮放：</strong> 預設 (100%)。</li>
+                <li><strong>頁首及頁尾：</strong> 不勾選。</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 證書預覽區域 -->
+    <div id="certificate-preview">
+        <div class="cert-content-wrapper">
+            <div class="cert-header">義工證明書</div>
+            
+            <div class="cert-body">
+                茲證明 <span id="display-name" class="highlight">（姓名）</span> 於 <span id="display-date-range" class="highlight">（活動日期）</span> 期間，<br>
+                參與本中心舉辦的義工活動共 <span id="display-hours" class="highlight">（時數）</span>，<br>
+                並積極及投入參與，精神可嘉，特予證明。
+            </div>
+
+            <div class="cert-footer">
+                <div class="org-name">香港小童群益會賽馬會屯門青少年綜合服務中心</div>
+                <div><span class="date-label">日期：</span><span id="current-date" class="date-value">2026年07月09日</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 設定今日日期
+        function setTodayDate() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            document.getElementById('current-date').innerText = `${year}年${month}月${day}日`;
+        }
+
+        // 即時更新預覽
+        function updateCert() {
+            const name = document.getElementById('input-name').value || '（姓名）';
+            const dateRange = document.getElementById('input-date-range').value || '（活動日期）';
+            let hours = document.getElementById('input-hours').value;
+            
+            // 如果有輸入時數，自動補上「小時」單位
+            const hoursDisplay = hours ? (hours.includes('小時') ? hours : hours + '小時') : '（時數）';
+
+            document.getElementById('display-name').innerText = name;
+            document.getElementById('display-date-range').innerText = dateRange;
+            document.getElementById('display-hours').innerText = hoursDisplay;
+        }
+
+        // 調用系統列印
+        function handlePrint() {
+            window.print();
+        }
+
+        // 初始化
+        window.onload = setTodayDate;
+    </script>
+</body>
+</html>
